@@ -567,7 +567,7 @@
   let g = 980, m = 1, bounce = 0.8, startH = 200;
   let ghostFreq = 0.25;
   let useFriction = true, useDrag = true;
-  let y = 0, v = 0, thermal = 0;
+  let y = 0, v = 0, x = 0, vx = 0, thermal = 0;
   let playing = true, speed = 1, dragging = false;
   let history = [], hIndex = 0;
   let lastGhostT = 0, lastT = null;
@@ -596,7 +596,7 @@
 
   function reset() {
     readParams();
-    y = startH; v = 0; thermal = 0;
+    y = startH; v = 0; x = 0; vx = 0; thermal = 0;
     history = []; hIndex = 0;
     lastGhostT = 0; lastT = null;
     clearGhosts();
@@ -637,7 +637,7 @@
 
   function restoreState(s) {
     if (!s) return;
-    y = s.y; v = s.v; thermal = s.th * 10000;
+    y = s.y; v = s.v; x = s.x || 0; vx = s.vx || 0; thermal = s.th * 10000;
     renderBall();
     updateUI(s.pe, s.ke, s.th);
   }
@@ -651,8 +651,13 @@
     return h - Math.min(Math.max(y, 0), startH) * scale - 14;
   }
 
+  function pxX() {
+    const w = boxW();
+    return Math.min(Math.max(w / 2 + x, 14), w - 14);
+  }
+
   function renderBall() {
-    ballEl.style.left = (boxW() / 2) + 'px';
+    ballEl.style.left = pxX() + 'px';
     ballEl.style.top  = pxY() + 'px';
     hlabel.textContent = y.toFixed(0) + ' cm';
   }
@@ -680,9 +685,13 @@
       const drag = 0.0003 * v * Math.abs(v);
       thermal += Math.abs(drag * v * dt);
       v -= drag * dt;
+      const dragX = 0.0003 * vx * Math.abs(vx);
+      thermal += Math.abs(dragX * vx * dt);
+      vx -= dragX * dt;
     }
 
     y -= v * dt;
+    x += vx * dt;
 
     if (y <= 0) {
       y = -y;
@@ -696,6 +705,27 @@
     }
 
     if (y > startH) { y = startH; if (v < 0) v = 0; }
+
+    const halfW = boxW() / 2 - 14;
+    if (x > halfW) {
+      x = 2 * halfW - x;
+      if (useFriction) {
+        thermal += 0.5 * m * vx * vx * (1 - bounce * bounce);
+        vx = -vx * bounce;
+        if (Math.abs(vx) < 1.5) vx = 0;
+      } else {
+        vx = -Math.abs(vx);
+      }
+    } else if (x < -halfW) {
+      x = -2 * halfW - x;
+      if (useFriction) {
+        thermal += 0.5 * m * vx * vx * (1 - bounce * bounce);
+        vx = -vx * bounce;
+        if (Math.abs(vx) < 1.5) vx = 0;
+      } else {
+        vx = Math.abs(vx);
+      }
+    }
   }
 
   function updateUI(pe, ke, th) {
@@ -750,13 +780,13 @@
       addGhost(t);
     }
 
-    const pe = m * g * y       / 10000;
-    const ke = 0.5 * m * v * v / 10000;
-    const th = thermal          / 10000;
+    const pe = m * g * y                        / 10000;
+    const ke = 0.5 * m * (v * v + vx * vx)      / 10000;
+    const th = thermal                            / 10000;
 
     renderBall();
 
-    history.push({ y, v, pe, ke, th });
+    history.push({ y, v, x, vx, pe, ke, th });
     if (history.length > 500) history.shift();
     hIndex = history.length - 1;
 
@@ -770,16 +800,17 @@
   document.addEventListener('mouseup',  () => { if (dragging) { dragging = false; lastT = null; } });
   document.addEventListener('touchend', () => { if (dragging) { dragging = false; lastT = null; } });
 
-  function dragMove(clientY) {
+  function dragMove(clientX, clientY) {
     const r = boxEl.getBoundingClientRect();
-    const scale = startH / (r.height - 28);
-    y = Math.max(0, Math.min(startH, (r.height - (clientY - r.top)) * scale));
-    v = 0;
+    const scaleY = startH / (r.height - 28);
+    y = Math.max(0, Math.min(startH, (r.height - (clientY - r.top)) * scaleY));
+    x = Math.max(-(r.width / 2 - 14), Math.min(r.width / 2 - 14, clientX - r.left - r.width / 2));
+    v = 0; vx = 0;
     renderBall();
   }
 
-  document.addEventListener('mousemove', e => { if (dragging) dragMove(e.clientY); });
-  document.addEventListener('touchmove', e => { if (dragging) dragMove(e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('mousemove', e => { if (dragging) dragMove(e.clientX, e.clientY); });
+  document.addEventListener('touchmove', e => { if (dragging) dragMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
 
   reset();
   requestAnimationFrame(loop);
