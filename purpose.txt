@@ -1,0 +1,17 @@
+Create simulation of a bouncy ball that displays the transfer of potential gravitational energy to kinetic, etc.
+
+UI: 
+Color: Cream/light blue
+
+Ball display:
+Centered box containing ball.  (Height)
+ Height: adjustable by text input and dragging the ball around. (units: CM)
+
+"Friction" and "drag" toggle.
+ Toggles the existance of friction &/or drag (Energy loss to thermal)
+
+Drop button
+ ball drops when this is pressed, or when ball is no longer being moved by cursor.
+
+Energy display:
+centered rectangle below the ball-display box, make a LOL diagram that updates live
